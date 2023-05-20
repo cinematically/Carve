@@ -1,168 +1,190 @@
 import tkinter as tk
 from tkinter import filedialog, colorchooser
 import json
-
 import os
 import datetime
 
 LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"carve_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
-
 SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.carve")
 
-current_file = None
+class TextEditor:
+    def __init__(self):
+        self.root = tk.Tk()
+        self.root.title("Simple Text Editor")
 
-def log_event(event):
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    log_entry = f"[{timestamp}] {event}\n"
-    with open(LOG_FILE, "a") as log:
-        log.write(log_entry)
+        self.current_file = None
+        self.window_count = 0
+        self.text_clones = []
+        self.font_name = tk.StringVar()  # Initialize as StringVar
+        self.font_size = tk.IntVar(value=12)
 
-def open_file():
-    global current_file
-    filepath = filedialog.askopenfilename(filetypes=[("Text Files", "*.txt")])
-    if filepath:
-        current_file = filepath
-        log_event(f"Opened file: {current_file}")
-        with open(current_file, "r") as file:
-            text.delete(1.0, tk.END)
-            text.insert(tk.END, file.read())
+        self.text = tk.Text(self.root, wrap=tk.WORD)
+        self.text.pack(fill=tk.BOTH, expand=True)
 
-def new_file():
-    global current_file
-    current_file = None
-    log_event("Opened new file")
-    text.delete(1.0, tk.END)
+        self.menu_bar = tk.Menu(self.root)
+        self.root.config(menu=self.menu_bar)
 
-def save_file():
-    global current_file
-    if current_file:
-        log_event(f"Saved file: {current_file}")
-        with open(current_file, "w") as file:
-            file.write(text.get(1.0, tk.END))
-    else:
+        self.file_menu = tk.Menu(self.menu_bar, tearoff=False)
+        self.menu_bar.add_cascade(label="File", menu=self.file_menu)
+        self.file_menu.add_command(label="New", command=self.new_file)
+        self.file_menu.add_command(label="Open", command=self.open_file)
+        self.file_menu.add_command(label="Save", command=self.save_file)
+        self.file_menu.add_command(label="Save As", command=self.save_as_file)
+        self.file_menu.add_separator()
+        self.file_menu.add_command(label="Exit", command=self.on_closing)
+
+        self.settings_menu = tk.Menu(self.menu_bar, tearoff=False)
+        self.menu_bar.add_cascade(label="Settings", menu=self.settings_menu)
+        self.settings_menu.add_command(label="Font", command=self.open_settings)
+
+        self.button_frame = tk.Frame(self.root)
+        self.button_frame.pack()
+
+        self.root.bind("<Control-t>", lambda event: self.open_new_window)
+
+        self.load_settings()
+
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+    def log_event(self, event):
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        log_entry = f"[Carve] [{timestamp}] {event}\n"
+        with open(LOG_FILE, "a") as log:
+            log.write(log_entry)
+
+    def open_file(self):
+        filepath = filedialog.askopenfilename(filetypes=[("Text Files", "*.txt")])
+        if filepath:
+            self.current_file = filepath
+            self.log_event(f"Opened file: {self.current_file}")
+            with open(self.current_file, "r") as file:
+                self.text.delete(1.0, tk.END)
+                self.text.insert(tk.END, file.read())
+
+    def new_file(self):
+        self.current_file = None
+        self.log_event("Opened new file")
+        self.text.delete(1.0, tk.END)
+
+    def save_file(self):
+        if self.current_file:
+            self.log_event(f"Saved file: {self.current_file}")
+            with open(self.current_file, "w") as file:
+                file.write(self.text.get(1.0, tk.END))
+        else:
+            filepath = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text Files", "*.txt")])
+            if filepath:
+                self.current_file = filepath
+                self.log_event(f"Saved file: {self.current_file}")
+                with open(self.current_file, "w") as file:
+                    file.write(self.text.get(1.0, tk.END))
+
+    def save_as_file(self):
         filepath = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text Files", "*.txt")])
         if filepath:
-            current_file = filepath
-            log_event(f"Saved file: {current_file}")
-            with open(current_file, "w") as file:
-                file.write(text.get(1.0, tk.END))
+            self.current_file = filepath
+            self.log_event(f"Saved file as: {self.current_file}")
+            with open(self.current_file, "w") as file:
+                file.write(self.text.get(1.0, tk.END))
 
-def save_as_file():
-    global current_file
-    filepath = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text Files", "*.txt")])
-    if filepath:
-        current_file = filepath
-        log_event(f"Saved file as: {current_file}")
-        with open(current_file, "w") as file:
-            file.write(text.get(1.0, tk.END))
+    def open_settings(self):
+        settings_window = tk.Toplevel(self.root)
+        settings_window.title("Settings")
 
-def open_settings():
-    settings_window = tk.Toplevel(root)
-    settings_window.title("Settings")
+        def choose_background_color():
+            color = colorchooser.askcolor(title="Choose Background Color")[1]
+            if color:
+                self.text.config(bg=color)
 
-    def choose_background_color():
-        color = colorchooser.askcolor(title="Choose Background Color")[1]
-        if color:
-            text.config(bg=color)
+        def choose_font_color():
+            color = colorchooser.askcolor(title="Choose Font Color")[1]
+            if color:
+                self.text.config(fg=color)
 
-    def choose_font_color():
-        color = colorchooser.askcolor(title="Choose Font Color")[1]
-        if color:
-            text.config(fg=color)
+        def choose_font():
+            font = filedialog.askopenfilename(filetypes=[("Font Files", "*.ttf")])
+            if font:
+                self.text.config(font=(font, self.font_size.get()))
 
-    def choose_font():
-        font = filedialog.askopenfilename(filetypes=[("Font Files", "*.ttf")])
-        if font:
-            text.config(font=(font, font_size.get()))
+        def change_font_size(event):
+            self.text.config(font=(self.font_name.get(), self.font_size.get()))
 
-    def change_font_size(event):
-        text.config(font=(font_name.get(), font_size.get()))
+        def save_settings():
+            settings = {
+                "font_name": self.font_name.get(),
+                "font_size": self.font_size.get(),
+                "background_color": self.text.cget("background"),
+                "font_color": self.text.cget("foreground")
+            }
+            with open(SETTINGS_FILE, "w") as settings_file:
+                json.dump(settings, settings_file)
 
-    def save_settings():
-        settings = {
-            "font_name": font_name.get(),
-            "font_size": font_size.get(),
-            "background_color": text.cget("background"),
-            "font_color": text.cget("foreground")
-        }
-        with open(SETTINGS_FILE, "w") as settings_file:
-            json.dump(settings, settings_file)
+        def load_settings():
+            if os.path.exists(SETTINGS_FILE):
+                with open(SETTINGS_FILE, "r") as settings_file:
+                    settings = json.load(settings_file)
+                    self.font_name.set(settings.get("font_name", ""))
+                    self.font_size.set(settings.get("font_size", 12))
+                    self.text.config(bg=settings.get("background_color", "white"))
+                    self.text.config(fg=settings.get("font_color", "black"))
+                    self.log_event("Loaded settings")
 
-    def load_settings():
+        font_label = tk.Label(settings_window, text="Font:")
+        font_label.pack()
+
+        font_entry = tk.Entry(settings_window, textvariable=self.font_name)
+        font_entry.pack()
+
+        font_size_label = tk.Label(settings_window, text="Font Size:")
+        font_size_label.pack()
+
+        font_size_scale = tk.Scale(settings_window, from_=8, to=48, variable=self.font_size, orient=tk.HORIZONTAL, command=change_font_size)
+        font_size_scale.pack()
+
+        background_button = tk.Button(settings_window, text="Choose Background Color", command=choose_background_color)
+        background_button.pack()
+
+        font_color_button = tk.Button(settings_window, text="Choose Font Color", command=choose_font_color)
+        font_color_button.pack()
+
+        font_button = tk.Button(settings_window, text="Choose Font", command=choose_font)
+        font_button.pack()
+
+        save_button = tk.Button(settings_window, text="Save Settings", command=save_settings)
+        save_button.pack()
+
+        load_settings()
+
+    def load_settings(self):
         if os.path.exists(SETTINGS_FILE):
             with open(SETTINGS_FILE, "r") as settings_file:
                 settings = json.load(settings_file)
-                font_name.set(settings.get("font_name", ""))
-                font_size.set(settings.get("font_size", 12))
-                text.config(bg=settings.get("background_color", "white"))
-                text.config(fg=settings.get("font_color", "black"))
+                self.font_name.set(settings.get("font_name", ""))
+                self.font_size.set(settings.get("font_size", 12))
+                self.text.config(bg=settings.get("background_color", "white"))
+                self.text.config(fg=settings.get("font_color", "black"))
+                self.log_event("Loaded settings")
 
-    font_name = tk.StringVar()
-    font_size = tk.IntVar(value=12)
+    def open_new_window(self):
+        if self.window_count < 2:
+            self.window_count += 1
+            new_window = tk.Toplevel(self.root)
+            new_window.title(f"Editor {self.window_count}")
 
-    font_label = tk.Label(settings_window, text="Font:")
-    font_label.pack()
+            text_clone = tk.Text(new_window, wrap=tk.WORD)
+            text_clone.pack(fill=tk.BOTH, expand=True)
+            text_clone.config(font=(self.font_name.get(), self.font_size.get()))
 
-    font_entry = tk.Entry(settings_window, textvariable=font_name)
-    font_entry.pack()
+            self.text_clones.append(text_clone)
 
-    font_size_label = tk.Label(settings_window, text="Font Size:")
-    font_size_label.pack()
+    def on_closing(self):
+        self.log_event("Application stopped")
+        self.root.destroy()
 
-    font_size_scale = tk.Scale(settings_window, from_=8, to=48, variable=font_size, orient=tk.HORIZONTAL, command=change_font_size)
-    font_size_scale.pack()
+    def run(self):
+        self.root.mainloop()
 
-    background_button = tk.Button(settings_window, text="Choose Background Color", command=choose_background_color)
-    background_button.pack()
+if __name__ == "__main__":
+    editor = TextEditor()
+    editor.run()
 
-    font_color_button = tk.Button(settings_window, text="Choose Font Color", command=choose_font_color)
-    font_color_button.pack()
-
-    font_button = tk.Button(settings_window, text="Choose Font", command=choose_font)
-    font_button.pack()
-
-    save_button = tk.Button(settings_window, text="Save Settings", command=save_settings)
-    save_button.pack()
-
-    load_settings()
-
-def on_closing():
-    log_event("Application stopped")
-    root.destroy()
-
-# Create the main window
-root = tk.Tk()
-root.title("Simple Text Editor")
-
-# Create a text widget
-text = tk.Text(root, wrap=tk.WORD)
-text.pack(fill=tk.BOTH, expand=True)
-
-# Create a menu bar
-menu_bar = tk.Menu(root)
-root.config(menu=menu_bar)
-
-# Create the File menu
-file_menu = tk.Menu(menu_bar, tearoff=False)
-menu_bar.add_cascade(label="File", menu=file_menu)
-file_menu.add_command(label="New", command=new_file)
-file_menu.add_command(label="Open", command=open_file)
-file_menu.add_command(label="Save", command=save_file)
-file_menu.add_command(label="Save As", command=save_as_file)
-file_menu.add_separator()
-file_menu.add_command(label="Exit", command=on_closing)
-
-# Create the Settings menu
-settings_menu = tk.Menu(menu_bar, tearoff=False)
-menu_bar.add_cascade(label="Settings", menu=settings_menu)
-settings_menu.add_command(label="Font", command=open_settings)
-
-# Create buttons
-button_frame = tk.Frame(root)
-button_frame.pack()
-
-# Log application start
-log_event("Application started")
-
-# Run the application
-root.mainloop()
