@@ -1,1 +1,7 @@
-{"font_name": "", "font_size": 26, "background_color": "SystemWindow", "font_color": "SystemWindowText"}
+{
+    "font_name": "",
+    "font_size": 26,
+    "background_color": "SystemWindow",
+    "font_color": "SystemWindowText",
+    "syntax_highlighting_colors": {}
+}
