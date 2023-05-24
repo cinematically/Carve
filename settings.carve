@@ -1,7 +1,6 @@
 {
     "font_name": "",
-    "font_size": 26,
-    "background_color": "SystemWindow",
-    "font_color": "SystemWindowText",
-    "syntax_highlighting_colors": {}
+    "font_size": 36,
+    "background_color": "white",
+    "font_color": "black"
 }
