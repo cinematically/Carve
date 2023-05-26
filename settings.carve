@@ -1,6 +1,11 @@
 {
-    "font_name": "",
-    "font_size": 36,
+    "font_name": "Arial",
+    "font_size": 12,
     "background_color": "white",
-    "font_color": "black"
+    "font_color": "black",
+    "syntax_highlighting_colors": {
+        "keyword": "blue",
+        "operator": "purple",
+        "comment": "green"
+    }
 }

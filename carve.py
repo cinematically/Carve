@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import filedialog, colorchooser, simpledialog
 import json
 import os
+import subprocess
 import datetime
 import re
 from syntax import c_syntax_highlighting
@@ -10,8 +11,9 @@ LOG_FILE = f"carve_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
 SETTINGS_FILE = "settings.carve"
 
 class TextFunctions:
-    def __init__(self, text_widget):
+    def __init__(self, text_widget, text_editor):
         self.text_widget = text_widget
+        self.text_editor = text_editor
         self.undo_stack = []
         self.redo_stack = []
 
@@ -35,23 +37,30 @@ class TextFunctions:
             self.text_widget.insert("1.0", text_state)
 
     def find(self, event=None):
-        self.text_widget.tag_remove("match", "1.0", tk.END)
+        self.find_dialog()
+
+    def find_dialog(self):
         search_term = simpledialog.askstring("Find", "Enter text:")
         if search_term:
-            matches = 0
-            start_pos = "1.0"
-            while True:
-                start_pos = self.text_widget.search(search_term, start_pos, stopindex=tk.END)
-                if not start_pos:
-                    break
-                end_pos = f"{start_pos}+{len(search_term)}c"
-                self.text_widget.tag_add("match", start_pos, end_pos)
-                matches += 1
-                self.text_widget.tag_config("match", foreground=self.match_foreground, background=self.match_background)
-                start_pos = end_pos
+            self.find_text(search_term)
+
+    def find_text(self, search_term):
+        self.text_widget.tag_remove("match", "1.0", tk.END)
+        matches = 0
+        start_pos = "1.0"
+        while True:
+            start_pos = self.text_widget.search(search_term, start_pos, stopindex=tk.END)
+            if not start_pos:
+                break
+            end_pos = f"{start_pos}+{len(search_term)}c"
+            self.text_widget.tag_add("match", start_pos, end_pos)
+            matches += 1
+            self.text_widget.tag_config("match", foreground=self.text_editor.keyword_color.get(), background=self.text_editor.operator_color.get())
+            start_pos = end_pos
 
     def cut_selected(self, event=None):
         self.text_widget.event_generate("<<Cut>>")
+
 
 class TextEditor:
     def __init__(self):
@@ -91,6 +100,9 @@ class TextEditor:
         self.button_frame = tk.Frame(self.root)
         self.button_frame.pack()
 
+        self.play_button = tk.Button(self.button_frame, text="Play", command=self.execute_script)
+        self.play_button.pack(side=tk.LEFT, padx=5, pady=5)
+
         self.root.bind("<Control-t>", lambda event: self.open_new_window())
         self.root.bind("<Control-z>", self.undo)
         self.root.bind("<Control-y>", self.redo)
@@ -102,7 +114,20 @@ class TextEditor:
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
 
         self.settings = self.load_settings()
-        self.text_functions = TextFunctions(self.text)
+        self.text_functions = TextFunctions(self.text, self)
+
+    def execute_script(self):
+        if self.current_file:
+            process = subprocess.Popen(["python", self.current_file], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            output, error = process.communicate()
+            if output:
+                print("Output:")
+                print(output.decode())
+            if error:
+                print("Error:")
+                print(error.decode())
+        else:
+            print("No file open to execute.")
 
     def undo(self, event=None):
         self.text_functions.undo()
@@ -123,7 +148,7 @@ class TextEditor:
             log.write(log_entry)
 
     def open_file(self):
-        filepath = filedialog.askopenfilename(filetypes=[("Text Files", "*.txt"), ("C Files", "*.c"), ("Lua Files", "*.lua")])
+        filepath = filedialog.askopenfilename(filetypes=[("Text Files", "*.txt"), ("C Files", "*.c"), ("Lua Files", "*.lua"), ("Python Files", "*.py")])
         if filepath:
             self.current_file = filepath
             self.log_event(f"Opened file: {self.current_file}")
@@ -143,9 +168,9 @@ class TextEditor:
             with open(self.current_file, "w") as file:
                 file.write(self.text.get(1.0, tk.END))
         else:
-            filepath = filedialog.asksaveasfilename(defaultextension=".c", filetypes=[("C Files", "*.c"), ("Text Files", "*.txt"), ("Lua Files", "*.lua")])
+            filepath = filedialog.asksaveasfilename(defaultextension=".c", filetypes=[("C Files", "*.c"), ("Text Files", "*.txt"), ("Lua Files", "*.lua"), ("Python Files", "*.py")])
             if filepath:
-                if not filepath.endswith((".c", ".txt", ".lua")):
+                if not filepath.endswith((".c", ".txt", ".lua", ".py")):
                     filepath += ".c"
                 self.current_file = filepath
                 self.log_event(f"Saved file: {self.current_file}")
@@ -299,6 +324,23 @@ class TextEditor:
         if os.path.exists(SETTINGS_FILE):
             with open(SETTINGS_FILE, "r") as settings_file:
                 settings = json.load(settings_file)
+        else:
+            # Default settings
+            settings = {
+                "font_name": "Arial",
+                "font_size": 12,
+                "background_color": "white",
+                "font_color": "black",
+                "syntax_highlighting_colors": {
+                    "keyword": "blue",
+                    "operator": "purple",
+                    "comment": "green",
+                },
+            }
+            with open(SETTINGS_FILE, "w") as settings_file:
+                json.dump(settings, settings_file, indent=4)
+                self.log_event("Generated default settings file.")
+
         self.font_name.set(settings.get("font_name", ""))
         self.font_size.set(settings.get("font_size", 12))
         self.text.config(bg=settings.get("background_color", "white"))
